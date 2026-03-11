@@ -4,7 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
-class Facilty extends Model
+class Facility extends Model
 {
     use HasFactory, SoftDeletes;
 
