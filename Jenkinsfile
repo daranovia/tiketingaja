@@ -1,33 +1,76 @@
-node {
+pipeline {
+    agent any
 
-    // Checkout kode dari repository
-    checkout scm
-
-    stage('Build') {
-        docker.image('composer:2').inside('-u root') {
-            sh 'rm -f composer.lock'
-            sh 'composer install'
-        }
+    environment {
+        APP_DIR = "/var/jenkins_home/workspace/laravel-dev"
     }
 
-    stage('Testing') {
-        docker.image('ubuntu').inside('-u root') {
-            sh 'echo "Ini adalah test"'
+    stages {
+
+        stage('Checkout') {
+            steps {
+                git url: 'https://github.com/daranovia/tiketingaja.git', branch: 'main'
+            }
         }
+
+        stage('Build') {
+            steps {
+                script {
+                    // Fix Git safe directory
+                    sh "git config --global --add safe.directory ${APP_DIR}"
+
+                    // Jalankan composer di container dengan entrypoint kosong
+                    docker.image('composer:2').inside('--entrypoint="" -u 1000:1000 -w ${APP_DIR}') {
+                        sh 'rm -f composer.lock'
+                        sh 'composer install'
+                        sh 'composer dump-autoload -o'
+                    }
+                }
+            }
+        }
+
+        stage('Testing') {
+            steps {
+                script {
+                    // Bisa pakai Ubuntu container untuk testing
+                    docker.image('ubuntu:latest').inside('--entrypoint="" -u 1000:1000 -w ${APP_DIR}') {
+                        sh 'echo "Ini adalah test"'
+                        // Tambahkan unit test Laravel jika perlu
+                        // sh 'php artisan test'
+                    }
+                }
+            }
+        }
+
+        stage('Deploy to Production') {
+            steps {
+                script {
+                    docker.image('agung3wi/alpine-rsync:1.1').inside('--entrypoint="" -u 1000:1000 -w ${APP_DIR}') {
+                        sshagent(['ubuntu']) {
+                            // Buat folder .ssh di container (jika perlu)
+                            sh 'mkdir -p /root/.ssh'
+
+                            // Tambahkan host key server produksi
+                            sh 'ssh-keyscan -H 172.31.94.247 >> /root/.ssh/known_hosts'
+
+                            // Contoh rsync deploy, sesuaikan src & dest
+                            sh '''
+                                rsync -avz --delete ./ ubuntu@172.31.94.247:/var/www/laravel-app
+                            '''
+                        }
+                    }
+                }
+            }
+        }
+
     }
 
-    stage('Deploy to Production') {
-    docker.image('agung3wi/alpine-rsync:1.1').inside('-u root') {
-        sshagent (credentials: ['ssh-prod']) {
-            sh 'mkdir -p ~/.ssh'
-            sh 'ssh-keyscan -H "$PROD_HOST" >> ~/.ssh/known_hosts'
-
-            // gunakan triple quotes untuk multi-line command rsync
-            sh """
-            rsync -rav --delete ./laravel/ ubuntu@$PROD_HOST:/home/ubuntu/prod.kelasdevops.xyz/ \
-            --exclude=.env --exclude=storage --exclude=.git
-            """
+    post {
+        failure {
+            echo "Pipeline gagal, cek log di stage yang error."
+        }
+        success {
+            echo "Pipeline berhasil dijalankan."
         }
     }
-}
 }
