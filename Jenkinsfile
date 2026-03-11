@@ -1,5 +1,6 @@
 node {
 
+    // Checkout kode dari repository
     checkout scm
 
     stage('Build') {
@@ -14,15 +15,20 @@ node {
             sh 'echo "Ini adalah test"'
         }
     }
- // deploy env prod
-docker.image('agung3wi/alpine-rsync:1.1').inside('-u root') {
-sshagent (credentials: ['ssh-prod']) {
-sh 'mkdir -p ~/.ssh'
-sh 'ssh-keyscan -H "$PROD_HOST" > ~/.ssh/known_hosts'
-sh "rsync -rav --delete ./laravel/
-ubuntu@$PROD_HOST:/home/ubuntu/prod.kelasdevops.xyz/ --exclude=.env -
--exclude=storage --exclude=.git"
-}
-}
-}
 
+    stage('Deploy to Production') {
+        docker.image('agung3wi/alpine-rsync:1.1').inside('-u root') {
+            sshagent (credentials: ['ssh-prod']) {
+                // Pastikan known_hosts terupdate
+                sh 'mkdir -p ~/.ssh'
+                sh 'ssh-keyscan -H "$PROD_HOST" >> ~/.ssh/known_hosts'
+
+                // Jalankan rsync untuk deploy Laravel
+                sh """
+                rsync -rav --delete ./laravel/ ubuntu@$PROD_HOST:/home/ubuntu/prod.kelasdevops.xyz/ \
+                --exclude=.env --exclude=storage --exclude=.git
+                """
+            }
+        }
+    }
+}
