@@ -9,7 +9,7 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-                sshagent(['jenkins-ssh-key']) {
+                sshagent(['ubuntu']) {
                     sh '''
                         if [ ! -d ${SRC_DIR} ]; then
                             git clone -b main git@github.com:daranovia/tiketingaja.git ${SRC_DIR}
@@ -48,7 +48,7 @@ pipeline {
 
         stage('Deploy to Debian') {
             steps {
-                sshagent(['jenkins-ssh-key']) {
+                sshagent(['ubuntu']) {
                     sh """
                         ssh -o StrictHostKeyChecking=no nanta@192.168.0.103 "mkdir -p /home/nanta/prod.kelasdevops.xyz/prod"
 
