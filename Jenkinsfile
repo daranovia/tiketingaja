@@ -21,7 +21,7 @@ pipeline {
                 script {
                     sh "git config --global --add safe.directory ${APP_DIR}"
 
-                    docker.image('composer:2').inside('-u 1000:1000 -w ${APP_DIR}') {
+                    docker.image('composer:2').inside('--network host -u 1000:1000 -w ${APP_DIR}') {
                         sh '''
                             echo "Installing Composer Dependencies..."
 
