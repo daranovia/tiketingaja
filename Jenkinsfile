@@ -2,7 +2,6 @@ pipeline {
     agent any
 
     environment {
-        COMPOSER_HOME = "${WORKSPACE}/.composer"
         SRC_DIR = "${WORKSPACE}/src"
         DEPLOY_USER = "nanta"
         DEPLOY_HOST = "192.168.0.103"
@@ -21,7 +20,6 @@ pipeline {
                         git fetch origin
                         git reset --hard origin/main
                     fi
-
                     git config --global --add safe.directory ${WORKSPACE}
                     git config --global --add safe.directory ${SRC_DIR}
                 '''
@@ -31,6 +29,7 @@ pipeline {
         stage('Build') {
             steps {
                 sh '''
+                    echo "==> Installing composer dependencies"
                     cd ${SRC_DIR}
                     composer install --no-dev --optimize-autoloader
                     php artisan package:discover --ansi
