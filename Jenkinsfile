@@ -3,6 +3,7 @@ pipeline {
 
     environment {
         COMPOSER_HOME = "${WORKSPACE}/.composer"
+        SRC_DIR = "${WORKSPACE}/src"
     }
 
     stages {
@@ -10,16 +11,16 @@ pipeline {
             steps {
                 sshagent(['jenkins-ssh-key']) {
                     sh '''
-                        if [ ! -d src ]; then
-                            git clone -b main git@github.com:daranovia/tiketingaja.git src
+                        if [ ! -d ${SRC_DIR} ]; then
+                            git clone -b main git@github.com:daranovia/tiketingaja.git ${SRC_DIR}
                         else
-                            cd src
+                            cd ${SRC_DIR}
                             git fetch origin
                             git reset --hard origin/main
                         fi
 
                         git config --global --add safe.directory ${WORKSPACE}
-                        git config --global --add safe.directory ${WORKSPACE}/src
+                        git config --global --add safe.directory ${SRC_DIR}
                     '''
                 }
             }
@@ -30,7 +31,7 @@ pipeline {
                 script {
                     docker.image('composer:2').inside('--entrypoint=""') {
                         sh '''
-                            cd src
+                            cd ${SRC_DIR}
                             composer install --no-dev --optimize-autoloader
                             php artisan package:discover --ansi
                         '''
@@ -51,7 +52,7 @@ pipeline {
                     sh """
                         ssh -o StrictHostKeyChecking=no nanta@192.168.0.103 "mkdir -p /home/nanta/prod.kelasdevops.xyz/prod"
 
-                        scp -o StrictHostKeyChecking=no -r ${WORKSPACE}/src/* nanta@192.168.0.103:/home/nanta/prod.kelasdevops.xyz/prod/
+                        scp -o StrictHostKeyChecking=no -r ${SRC_DIR}/* nanta@192.168.0.103:/home/nanta/prod.kelasdevops.xyz/prod/
 
                         ssh -o StrictHostKeyChecking=no nanta@192.168.0.103 '
                             cd /home/nanta/prod.kelasdevops.xyz/prod
