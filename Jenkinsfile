@@ -4,25 +4,27 @@ pipeline {
     environment {
         COMPOSER_HOME = "${WORKSPACE}/.composer"
         SRC_DIR = "${WORKSPACE}/src"
+        DEPLOY_USER = "nanta"
+        DEPLOY_HOST = "192.168.0.103"
+        DEPLOY_PATH = "/home/nanta/prod.kelasdevops.xyz/prod"
     }
 
     stages {
         stage('Checkout') {
             steps {
-                sshagent(['ubuntu']) {
-                    sh '''
-                        if [ ! -d ${SRC_DIR} ]; then
-                            git clone -b main git@github.com:daranovia/tiketingaja.git ${SRC_DIR}
-                        else
-                            cd ${SRC_DIR}
-                            git fetch origin
-                            git reset --hard origin/main
-                        fi
+                sh '''
+                    if [ ! -d ${SRC_DIR} ]; then
+                        # Clone public repo tanpa SSH key
+                        git clone -b main https://github.com/daranovia/tiketingaja.git ${SRC_DIR}
+                    else
+                        cd ${SRC_DIR}
+                        git fetch origin
+                        git reset --hard origin/main
+                    fi
 
-                        git config --global --add safe.directory ${WORKSPACE}
-                        git config --global --add safe.directory ${SRC_DIR}
-                    '''
-                }
+                    git config --global --add safe.directory ${WORKSPACE}
+                    git config --global --add safe.directory ${SRC_DIR}
+                '''
             }
         }
 
