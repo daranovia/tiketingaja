@@ -12,6 +12,8 @@ pipeline {
 
         stage('Checkout') {
             steps {
+             
+                deleteDir()
                 git url: 'https://github.com/daranovia/tiketingaja.git', branch: 'main'
             }
         }
@@ -19,31 +21,32 @@ pipeline {
         stage('Build') {
             steps {
                 script {
+                    echo "Installing Composer Dependencies..."
+
+
                     sh '''
-                        rm -f /var/jenkins_home/.gitconfig.lock
-                        git config --global --add safe.directory ${APP_DIR}
-                    '''
-
-                    docker.image('composer:2').inside('--network host') {
-                        sh '''
-                            echo "Installing Composer Dependencies..."
-
+                        docker run --rm -v $PWD:/app -w /app composer:2 bash -c "
                             rm -f composer.lock
                             composer install --no-interaction --prefer-dist
                             composer dump-autoload -o
-                        '''
-                    }
+                        "
+                    '''
                 }
             }
         }
+
         stage('Testing') {
             steps {
                 script {
-                    docker.image('ubuntu:latest').inside('-u 1000:1000 -w ${APP_DIR}') {
-                        sh '''
-                            echo "Testing pipeline berjalan..."
-                        '''
-                    }
+                    echo "Testing pipeline berjalan..."
+
+                    sh '''
+                        if [ -f ./vendor/bin/phpunit ]; then
+                            ./vendor/bin/phpunit --colors=always
+                        else
+                            echo "PHPUnit tidak ditemukan, skip testing"
+                        fi
+                    '''
                 }
             }
         }
@@ -51,21 +54,16 @@ pipeline {
         stage('Deploy to Production') {
             steps {
                 script {
-                    docker.image('agung3wi/alpine-rsync:1.1').inside('-u 0:0 -w ${APP_DIR}') {
+                    echo "Deploying ke server..."
 
-                        sshagent(['ubuntu']) {
 
-                            sh """
-                                echo "Deploying ke server..."
-
-                                rsync -avz --delete \
-                                -e "ssh -o StrictHostKeyChecking=no" \
-                                --exclude='.git' \
-                                --exclude='node_modules' \
-                                --exclude='vendor' \
-                                ./ ${SERVER_USER}@${SERVER_IP}:${SERVER_DIR}
-                            """
-                        }
+                    sshagent(['ubuntu']) {
+                        sh """
+                            rsync -avz --delete \
+                            -e "ssh -o StrictHostKeyChecking=no" \
+                            --exclude='.git' --exclude='node_modules' --exclude='vendor' \
+                            ./ ${SERVER_USER}@${SERVER_IP}:${SERVER_DIR}
+                        """
                     }
                 }
             }
@@ -75,11 +73,10 @@ pipeline {
 
     post {
         success {
-            echo "Pipeline berhasil dijalankan 🚀"
+            echo "Pipeline berhasil dijalankan"
         }
-
         failure {
-            echo "Pipeline gagal ❌ cek log"
+            echo "Pipeline gagal cek log"
         }
     }
 }
