@@ -3,7 +3,7 @@ pipeline {
 
     environment {
         APP_DIR = "/var/jenkins_home/workspace/laravel-dev"
-        SERVER_IP = "host.docker.internal"
+        SERVER_IP = "192.168.0.103"
         SERVER_USER = "nanta"
         SERVER_DIR = "/var/www/laravel-app"
     }
