@@ -46,7 +46,7 @@ pipeline {
             }
         }
 
-       stage('Deploy to Production') {
+      stage('Deploy to Production') {
             steps {
                 script {
                     docker.image('agung3wi/alpine-rsync:1.1').inside('--entrypoint="" -u 1000:1000 -w ${APP_DIR}') {
@@ -56,11 +56,13 @@ pipeline {
                             sh '''
                                 echo "Setup SSH"
 
-                                mkdir -p ${APP_DIR}/.ssh
-                                chmod 700 ${APP_DIR}/.ssh
+                                mkdir -p ~/.ssh
+                                chmod 700 ~/.ssh
 
-                                ssh-keyscan -H ${SERVER_IP} >> ${APP_DIR}/.ssh/known_hosts
-                                chmod 644 ${APP_DIR}/.ssh/known_hosts
+                                ssh-keyscan -H 172.31.94.247 >> ~/.ssh/known_hosts
+                                chmod 644 ~/.ssh/known_hosts
+
+                                echo "Start Deploy"
                             '''
 
                             sh '''
@@ -69,7 +71,7 @@ pipeline {
                                 --exclude='.git' \
                                 --exclude='node_modules' \
                                 --exclude='vendor' \
-                                ./ ${SERVER_USER}@${SERVER_IP}:${SERVER_DIR}
+                                ./ ubuntu@172.31.94.247:/var/www/laravel-app
                             '''
                         }
                     }
