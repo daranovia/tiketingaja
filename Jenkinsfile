@@ -43,25 +43,29 @@ pipeline {
         }
 
         stage('Deploy to Production') {
-            steps {
-                script {
-                    docker.image('agung3wi/alpine-rsync:1.1').inside('--entrypoint="" -u 1000:1000 -w ${APP_DIR}') {
-                        sshagent(['ubuntu']) {
-                            // Buat folder .ssh di container (jika perlu)
-                            sh 'mkdir -p /root/.ssh'
+    steps {
+        script {
+            docker.image('agung3wi/alpine-rsync:1.1').inside('--entrypoint="" -u 1000:1000 -w ${APP_DIR}') {
+                sshagent(['ubuntu']) {
 
-                            // Tambahkan host key server produksi
-                            sh 'ssh-keyscan -H 172.31.94.247 >> /root/.ssh/known_hosts'
+                    // Buat folder ssh
+                    sh '''
+                        mkdir -p ~/.ssh
+                        chmod 700 ~/.ssh
+                    '''
 
-                            // Contoh rsync deploy, sesuaikan src & dest
-                            sh '''
-                                rsync -avz --delete ./ ubuntu@172.31.94.247:/var/www/laravel-app
-                            '''
-                        }
-                    }
+                    // Tambahkan host key server produksi
+                    sh 'ssh-keyscan -H 172.31.94.247 >> ~/.ssh/known_hosts'
+
+                    // Deploy menggunakan rsync
+                    sh '''
+                        rsync -avz --delete ./ ubuntu@172.31.94.247:/var/www/laravel-app
+                    '''
                 }
             }
         }
+    }
+}
 
     }
 
