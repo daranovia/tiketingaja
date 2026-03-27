@@ -46,7 +46,7 @@ pipeline {
             }
         }
 
-        stage('Deploy to Production') {
+       stage('Deploy to Production') {
             steps {
                 script {
                     docker.image('agung3wi/alpine-rsync:1.1').inside('--entrypoint="" -u 1000:1000 -w ${APP_DIR}') {
@@ -56,17 +56,16 @@ pipeline {
                             sh '''
                                 echo "Setup SSH"
 
-                                mkdir -p ~/.ssh
-                                chmod 700 ~/.ssh
+                                mkdir -p ${APP_DIR}/.ssh
+                                chmod 700 ${APP_DIR}/.ssh
 
-                                ssh-keyscan -H ${SERVER_IP} >> ~/.ssh/known_hosts
-                                chmod 644 ~/.ssh/known_hosts
-
-                                echo "Deploy ke server"
+                                ssh-keyscan -H ${SERVER_IP} >> ${APP_DIR}/.ssh/known_hosts
+                                chmod 644 ${APP_DIR}/.ssh/known_hosts
                             '''
 
                             sh '''
                                 rsync -avz --delete \
+                                -e "ssh -o StrictHostKeyChecking=no" \
                                 --exclude='.git' \
                                 --exclude='node_modules' \
                                 --exclude='vendor' \
