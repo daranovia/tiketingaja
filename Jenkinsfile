@@ -2,84 +2,65 @@ pipeline {
     agent any
 
     environment {
-        APP_DIR = "/var/jenkins_home/workspace/laravel-dev"
-        SERVER_IP = "192.168.0.103"
-        SERVER_USER = "nanta"
-        SERVER_DIR = "/var/www/laravel-app"
+        COMPOSER_HOME = "${WORKSPACE}/.composer"
     }
 
     stages {
-
         stage('Checkout') {
             steps {
-                git url: 'https://github.com/daranovia/tiketingaja.git', branch: 'main'
+                sshagent(['jenkins-ssh-key']) {
+                    sh '''
+                        if [ ! -d src ]; then
+                            git clone -b main ssh://git@ssh.github.com:443/nanditaputrihj/devops-laravel.git src
+                        else
+                            cd src
+                            git fetch origin
+                            git reset --hard origin/main
+                        fi
+
+                        git config --global --add safe.directory ${WORKSPACE}
+                        git config --global --add safe.directory ${WORKSPACE}/src
+                    '''
+                }
             }
         }
 
         stage('Build') {
             steps {
                 script {
-                    sh '''
-                        rm -f /var/jenkins_home/.gitconfig.lock
-                        git config --global --add safe.directory ${APP_DIR}
-                    '''
-
-                    docker.image('composer:2').inside('--network host') {
+                    docker.image('composer:2').inside('--entrypoint=""') {
                         sh '''
-                            echo "Installing Composer Dependencies..."
-
-                            rm -f composer.lock
-                            composer install --no-interaction --prefer-dist
-                            composer dump-autoload -o
+                            cd src
+                            composer install --no-dev --optimize-autoloader
+                            php artisan package:discover --ansi
                         '''
                     }
                 }
             }
         }
+
         stage('Testing') {
             steps {
-                script {
-                    docker.image('ubuntu:latest').inside('-u 1000:1000 -w ${APP_DIR}') {
-                        sh '''
-                            echo "Testing pipeline berjalan..."
-                        '''
-                    }
-                }
+                echo 'Testing stage'
             }
         }
 
-        stage('Deploy to Production') {
+        stage('Deploy to Debian') {
             steps {
-                script {
-                    docker.image('agung3wi/alpine-rsync:1.1').inside('-u 0:0 -w ${APP_DIR}') {
+                sshagent(['jenkins-ssh-key']) {
+                    sh """
+                        ssh -o StrictHostKeyChecking=no nandita@192.168.100.10 "mkdir -p /home/nandita/prod.kelasdevops.xyz/prod"
 
-                        sshagent(['ubuntu']) {
+                        scp -o StrictHostKeyChecking=no -r ${WORKSPACE}/src/* nandita@192.168.100.10:/home/nandita/prod.kelasdevops.xyz/prod/
 
-                            sh """
-                                echo "Deploying ke server..."
-
-                                rsync -avz --delete \
-                                -e "ssh -o StrictHostKeyChecking=no" \
-                                --exclude='.git' \
-                                --exclude='node_modules' \
-                                --exclude='vendor' \
-                                ./ ${SERVER_USER}@${SERVER_IP}:${SERVER_DIR}
-                            """
-                        }
-                    }
+                        ssh -o StrictHostKeyChecking=no nandita@192.168.100.10 '
+                            cd /home/nandita/prod.kelasdevops.xyz/prod
+                            composer install --no-dev --optimize-autoloader
+                            php artisan migrate --force
+                        '
+                    """
                 }
             }
-        }
-
-    }
-
-    post {
-        success {
-            echo "Pipeline berhasil dijalankan"
-        }
-
-        failure {
-            echo "Pipeline gagal cek log"
         }
     }
 }
