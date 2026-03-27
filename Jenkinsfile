@@ -3,6 +3,9 @@ pipeline {
 
     environment {
         APP_DIR = "/var/jenkins_home/workspace/laravel-dev"
+        SERVER_IP = "172.31.94.247"
+        SERVER_USER = "ubuntu"
+        SERVER_DIR = "/var/www/laravel-app"
     }
 
     stages {
@@ -19,11 +22,13 @@ pipeline {
                     // Fix Git safe directory
                     sh "git config --global --add safe.directory ${APP_DIR}"
 
-                    // Jalankan composer di container dengan entrypoint kosong
+                    // Composer install
                     docker.image('composer:2').inside('--entrypoint="" -u 1000:1000 -w ${APP_DIR}') {
-                        sh 'rm -f composer.lock'
-                        sh 'composer install'
-                        sh 'composer dump-autoload -o'
+                        sh '''
+                            rm -f composer.lock
+                            composer install --no-interaction --prefer-dist
+                            composer dump-autoload -o
+                        '''
                     }
                 }
             }
@@ -32,30 +37,40 @@ pipeline {
         stage('Testing') {
             steps {
                 script {
-                    // Bisa pakai Ubuntu container untuk testing
                     docker.image('ubuntu:latest').inside('--entrypoint="" -u 1000:1000 -w ${APP_DIR}') {
-                        sh 'echo "Ini adalah test"'
-                        // Tambahkan unit test Laravel jika perlu
-                        // sh 'php artisan test'
+                        sh '''
+                            echo "Ini adalah test pipeline"
+                        '''
                     }
                 }
             }
         }
 
-       stage('Deploy to Production') {
+        stage('Deploy to Production') {
             steps {
                 script {
                     docker.image('agung3wi/alpine-rsync:1.1').inside('--entrypoint="" -u 1000:1000 -w ${APP_DIR}') {
+
                         sshagent(['ubuntu']) {
 
                             sh '''
-                                mkdir -p .ssh
-                                chmod 700 .ssh
-                                ssh-keyscan -H 172.31.94.247 >> .ssh/known_hosts
+                                echo "Setup SSH"
+
+                                mkdir -p ~/.ssh
+                                chmod 700 ~/.ssh
+
+                                ssh-keyscan -H ${SERVER_IP} >> ~/.ssh/known_hosts
+                                chmod 644 ~/.ssh/known_hosts
+
+                                echo "Deploy ke server"
                             '''
 
                             sh '''
-                                rsync -avz --delete ./ ubuntu@172.31.94.247:/var/www/laravel-app
+                                rsync -avz --delete \
+                                --exclude='.git' \
+                                --exclude='node_modules' \
+                                --exclude='vendor' \
+                                ./ ${SERVER_USER}@${SERVER_IP}:${SERVER_DIR}
                             '''
                         }
                     }
@@ -66,11 +81,12 @@ pipeline {
     }
 
     post {
-        failure {
-            echo "Pipeline gagal, cek log di stage yang error."
-        }
         success {
-            echo "Pipeline berhasil dijalankan."
+            echo "Pipeline berhasil dijalankan 🚀"
+        }
+
+        failure {
+            echo "Pipeline gagal ❌ cek log"
         }
     }
 }
