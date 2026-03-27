@@ -2,69 +2,84 @@ pipeline {
     agent any
 
     environment {
-        SRC_DIR = "${WORKSPACE}/src"
-        DEPLOY_USER = "nanta"
-        DEPLOY_HOST = "192.168.0.103"
-        DEPLOY_PATH = "/home/nanta/prod.kelasdevops.xyz/prod"
+        APP_DIR = "/var/jenkins_home/workspace/laravel-dev"
+        SERVER_IP = "host.docker.internal"
+        SERVER_USER = "nanta"
+        SERVER_DIR = "/var/www/laravel-app"
     }
 
     stages {
+
         stage('Checkout') {
             steps {
-                sh '''
-                    echo "==> Checkout repository"
-                    if [ ! -d ${SRC_DIR} ]; then
-                        git clone -b main https://github.com/daranovia/tiketingaja.git ${SRC_DIR}
-                    else
-                        cd ${SRC_DIR}
-                        git fetch origin
-                        git reset --hard origin/main
-                    fi
-                    git config --global --add safe.directory ${WORKSPACE}
-                    git config --global --add safe.directory ${SRC_DIR}
-                '''
+                git url: 'https://github.com/daranovia/tiketingaja.git', branch: 'main'
             }
         }
 
         stage('Build') {
             steps {
                 script {
-                    docker.image('composer:2').inside('--entrypoint=""') {
+                    sh '''
+                        rm -f /var/jenkins_home/.gitconfig.lock
+                        git config --global --add safe.directory ${APP_DIR}
+                    '''
+
+                    docker.image('composer:2').inside('--network host') {
                         sh '''
-                            cd ${SRC_DIR}
-                            composer install --no-dev --optimize-autoloader
-                            php artisan package:discover --ansi
+                            echo "Installing Composer Dependencies..."
+
+                            rm -f composer.lock
+                            composer install --no-interaction --prefer-dist
+                            composer dump-autoload -o
+                        '''
+                    }
+                }
+            }
+        }
+        stage('Testing') {
+            steps {
+                script {
+                    docker.image('ubuntu:latest').inside('-u 1000:1000 -w ${APP_DIR}') {
+                        sh '''
+                            echo "Testing pipeline berjalan..."
                         '''
                     }
                 }
             }
         }
 
-        stage('Testing') {
+        stage('Deploy to Production') {
             steps {
-                echo "==> Placeholder Testing Stage"
+                script {
+                    docker.image('agung3wi/alpine-rsync:1.1').inside('-u 0:0 -w ${APP_DIR}') {
+
+                        sshagent(['ubuntu']) {
+
+                            sh """
+                                echo "Deploying ke server..."
+
+                                rsync -avz --delete \
+                                -e "ssh -o StrictHostKeyChecking=no" \
+                                --exclude='.git' \
+                                --exclude='node_modules' \
+                                --exclude='vendor' \
+                                ./ ${SERVER_USER}@${SERVER_IP}:${SERVER_DIR}
+                            """
+                        }
+                    }
+                }
             }
         }
 
-        stage('Deploy to Debian') {
-            steps {
-                sshagent(['debian-ssh']) {
-                    sh """
-                        echo "==> Creating deploy directory on server"
-                        ssh -o StrictHostKeyChecking=no nanta@192.168.0.103 "mkdir -p /home/nanta/prod.kelasdevops.xyz/prod"
+    }
 
-                        echo "==> Copying files to server"
-                        scp -o StrictHostKeyChecking=no -r ${SRC_DIR}/* nanta@192.168.0.103:/home/nanta/prod.kelasdevops.xyz/prod/
+    post {
+        success {
+            echo "Pipeline berhasil dijalankan 🚀"
+        }
 
-                        echo "==> Running composer & migrate on server"
-                        ssh -o StrictHostKeyChecking=no nanta@192.168.0.103 '
-                            cd /home/nanta/prod.kelasdevops.xyz/prod
-                            composer install --no-dev --optimize-autoloader
-                            php artisan migrate --force
-                        '
-                    """
-                }
-            }
+        failure {
+            echo "Pipeline gagal ❌ cek log"
         }
     }
 }
