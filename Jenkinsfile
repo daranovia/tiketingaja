@@ -53,7 +53,7 @@ pipeline {
 
                         sshagent(['ubuntu']) {
 
-                            sh '''
+                            sh """
                                 echo "Deploying ke server..."
 
                                 rsync -avz --delete \
@@ -62,7 +62,7 @@ pipeline {
                                 --exclude='node_modules' \
                                 --exclude='vendor' \
                                 ./ ${SERVER_USER}@${SERVER_IP}:${SERVER_DIR}
-                            '''
+                            """
                         }
                     }
                 }
