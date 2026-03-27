@@ -28,12 +28,15 @@ pipeline {
 
         stage('Build') {
             steps {
-                sh '''
-                    echo "==> Installing composer dependencies"
-                    cd ${SRC_DIR}
-                    composer install --no-dev --optimize-autoloader
-                    php artisan package:discover --ansi
-                '''
+                script {
+                    docker.image('composer:2').inside('--entrypoint=""') {
+                        sh '''
+                            cd ${SRC_DIR}
+                            composer install --no-dev --optimize-autoloader
+                            php artisan package:discover --ansi
+                        '''
+                    }
+                }
             }
         }
 
