@@ -13,8 +13,8 @@ pipeline {
         stage('Checkout') {
             steps {
                 sh '''
+                    echo "==> Checkout repository"
                     if [ ! -d ${SRC_DIR} ]; then
-                        # Clone public repo tanpa SSH key
                         git clone -b main https://github.com/daranovia/tiketingaja.git ${SRC_DIR}
                     else
                         cd ${SRC_DIR}
@@ -30,32 +30,31 @@ pipeline {
 
         stage('Build') {
             steps {
-                script {
-                    docker.image('composer:2').inside('--entrypoint=""') {
-                        sh '''
-                            cd ${SRC_DIR}
-                            composer install --no-dev --optimize-autoloader
-                            php artisan package:discover --ansi
-                        '''
-                    }
-                }
+                sh '''
+                    cd ${SRC_DIR}
+                    composer install --no-dev --optimize-autoloader
+                    php artisan package:discover --ansi
+                '''
             }
         }
 
         stage('Testing') {
             steps {
-                echo 'Testing stage'
+                echo "==> Placeholder Testing Stage"
             }
         }
 
         stage('Deploy to Debian') {
             steps {
-                sshagent(['ubuntu']) {
+                sshagent(['debian-ssh']) {
                     sh """
+                        echo "==> Creating deploy directory on server"
                         ssh -o StrictHostKeyChecking=no nanta@192.168.0.103 "mkdir -p /home/nanta/prod.kelasdevops.xyz/prod"
 
+                        echo "==> Copying files to server"
                         scp -o StrictHostKeyChecking=no -r ${SRC_DIR}/* nanta@192.168.0.103:/home/nanta/prod.kelasdevops.xyz/prod/
 
+                        echo "==> Running composer & migrate on server"
                         ssh -o StrictHostKeyChecking=no nanta@192.168.0.103 '
                             cd /home/nanta/prod.kelasdevops.xyz/prod
                             composer install --no-dev --optimize-autoloader
