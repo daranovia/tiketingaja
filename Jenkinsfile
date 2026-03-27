@@ -11,7 +11,7 @@ pipeline {
                 sshagent(['jenkins-ssh-key']) {
                     sh '''
                         if [ ! -d src ]; then
-                            git clone -b main ssh://git@ssh.github.com:443/nanditaputrihj/devops-laravel.git src
+                            git clone -b main git@github.com:daranovia/tiketingaja.git src
                         else
                             cd src
                             git fetch origin
@@ -49,12 +49,12 @@ pipeline {
             steps {
                 sshagent(['jenkins-ssh-key']) {
                     sh """
-                        ssh -o StrictHostKeyChecking=no nandita@192.168.100.10 "mkdir -p /home/nandita/prod.kelasdevops.xyz/prod"
+                        ssh -o StrictHostKeyChecking=no nanta@192.168.0.103 "mkdir -p /home/nanta/prod.kelasdevops.xyz/prod"
 
-                        scp -o StrictHostKeyChecking=no -r ${WORKSPACE}/src/* nandita@192.168.100.10:/home/nandita/prod.kelasdevops.xyz/prod/
+                        scp -o StrictHostKeyChecking=no -r ${WORKSPACE}/src/* nanta@192.168.0.103:/home/nanta/prod.kelasdevops.xyz/prod/
 
-                        ssh -o StrictHostKeyChecking=no nandita@192.168.100.10 '
-                            cd /home/nandita/prod.kelasdevops.xyz/prod
+                        ssh -o StrictHostKeyChecking=no nanta@192.168.0.103 '
+                            cd /home/nanta/prod.kelasdevops.xyz/prod
                             composer install --no-dev --optimize-autoloader
                             php artisan migrate --force
                         '
