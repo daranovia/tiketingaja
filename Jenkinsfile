@@ -19,12 +19,12 @@ pipeline {
         stage('Build') {
             steps {
                 script {
-                    // Fix Git safe directory
                     sh "git config --global --add safe.directory ${APP_DIR}"
 
-                    // Composer install
-                    docker.image('composer:2').inside('--entrypoint="" -u 1000:1000 -w ${APP_DIR}') {
+                    docker.image('composer:2').inside('-u 1000:1000 -w ${APP_DIR}') {
                         sh '''
+                            echo "Installing Composer Dependencies..."
+
                             rm -f composer.lock
                             composer install --no-interaction --prefer-dist
                             composer dump-autoload -o
@@ -37,41 +37,31 @@ pipeline {
         stage('Testing') {
             steps {
                 script {
-                    docker.image('ubuntu:latest').inside('--entrypoint="" -u 1000:1000 -w ${APP_DIR}') {
+                    docker.image('ubuntu:latest').inside('-u 1000:1000 -w ${APP_DIR}') {
                         sh '''
-                            echo "Ini adalah test pipeline"
+                            echo "Testing pipeline berjalan..."
                         '''
                     }
                 }
             }
         }
 
-      stage('Deploy to Production') {
+        stage('Deploy to Production') {
             steps {
                 script {
-                    docker.image('agung3wi/alpine-rsync:1.1').inside('-u 0:0') {
+                    docker.image('agung3wi/alpine-rsync:1.1').inside('-u 0:0 -w ${APP_DIR}') {
 
                         sshagent(['ubuntu']) {
 
                             sh '''
-                                echo "Setup SSH"
-
-                                mkdir -p /tmp/.ssh
-                                chmod 700 /tmp/.ssh
-
-                                ssh-keyscan -H 172.31.94.247 >> /tmp/.ssh/known_hosts
-                                chmod 644 /tmp/.ssh/known_hosts
-                            '''
-
-                            sh '''
-                                echo "Deploying..."
+                                echo "Deploying ke server..."
 
                                 rsync -avz --delete \
                                 -e "ssh -o StrictHostKeyChecking=no" \
                                 --exclude='.git' \
                                 --exclude='node_modules' \
                                 --exclude='vendor' \
-                                ./ ubuntu@172.31.94.247:/var/www/laravel-app
+                                ./ ${SERVER_USER}@${SERVER_IP}:${SERVER_DIR}
                             '''
                         }
                     }
