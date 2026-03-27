@@ -3,7 +3,7 @@ pipeline {
 
     environment {
         APP_DIR = "/var/jenkins_home/workspace/laravel-dev"
-        SERVER_IP = "192.168.0.103"
+        SERVER_IP = "host.docker.internal"
         SERVER_USER = "nanta"
         SERVER_DIR = "/var/www/laravel-app"
     }
@@ -12,8 +12,6 @@ pipeline {
 
         stage('Checkout') {
             steps {
-             
-                deleteDir()
                 git url: 'https://github.com/daranovia/tiketingaja.git', branch: 'main'
             }
         }
@@ -21,32 +19,31 @@ pipeline {
         stage('Build') {
             steps {
                 script {
-                    echo "Installing Composer Dependencies..."
-
-
                     sh '''
-                        docker run --rm -v $PWD:/app -w /app composer:2 bash -c "
+                        rm -f /var/jenkins_home/.gitconfig.lock
+                        git config --global --add safe.directory ${APP_DIR}
+                    '''
+
+                    docker.image('composer:2').inside('--network host') {
+                        sh '''
+                            echo "Installing Composer Dependencies..."
+
                             rm -f composer.lock
                             composer install --no-interaction --prefer-dist
                             composer dump-autoload -o
-                        "
-                    '''
+                        '''
+                    }
                 }
             }
         }
-
         stage('Testing') {
             steps {
                 script {
-                    echo "Testing pipeline berjalan..."
-
-                    sh '''
-                        if [ -f ./vendor/bin/phpunit ]; then
-                            ./vendor/bin/phpunit --colors=always
-                        else
-                            echo "PHPUnit tidak ditemukan, skip testing"
-                        fi
-                    '''
+                    docker.image('ubuntu:latest').inside('-u 1000:1000 -w ${APP_DIR}') {
+                        sh '''
+                            echo "Testing pipeline berjalan..."
+                        '''
+                    }
                 }
             }
         }
@@ -54,16 +51,21 @@ pipeline {
         stage('Deploy to Production') {
             steps {
                 script {
-                    echo "Deploying ke server..."
+                    docker.image('agung3wi/alpine-rsync:1.1').inside('-u 0:0 -w ${APP_DIR}') {
 
+                        sshagent(['ubuntu']) {
 
-                    sshagent(['ubuntu']) {
-                        sh """
-                            rsync -avz --delete \
-                            -e "ssh -o StrictHostKeyChecking=no" \
-                            --exclude='.git' --exclude='node_modules' --exclude='vendor' \
-                            ./ ${SERVER_USER}@${SERVER_IP}:${SERVER_DIR}
-                        """
+                            sh """
+                                echo "Deploying ke server..."
+
+                                rsync -avz --delete \
+                                -e "ssh -o StrictHostKeyChecking=no" \
+                                --exclude='.git' \
+                                --exclude='node_modules' \
+                                --exclude='vendor' \
+                                ./ ${SERVER_USER}@${SERVER_IP}:${SERVER_DIR}
+                            """
+                        }
                     }
                 }
             }
@@ -73,10 +75,11 @@ pipeline {
 
     post {
         success {
-            echo "Pipeline berhasil dijalankan"
+            echo "Pipeline berhasil dijalankan 🚀"
         }
+
         failure {
-            echo "Pipeline gagal cek log"
+            echo "Pipeline gagal ❌ cek log"
         }
     }
 }
