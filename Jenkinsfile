@@ -8,7 +8,6 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-                // clone repo
                 git branch: 'main', url: 'https://github.com/daranovia/tiketingaja.git'
             }
         }
@@ -16,6 +15,13 @@ pipeline {
         stage('Install Dependencies') {
             steps {
                 sh 'composer install --no-interaction --prefer-dist'
+            }
+        }
+
+        stage('Setup Environment') {
+            steps {
+                sh 'cp .env.example .env || true'
+                sh 'php artisan key:generate'
             }
         }
 
